@@ -55,12 +55,19 @@ def replace_cf_dependencies():
             symlink.type = tarfile.SYMTYPE
             symlink.linkname = destination
             tar.addfile(symlink)
+    get_jdk_dependency("java.11-jdk","java_sdk_11")
+    get_jdk_dependency("java.17-jdk","java_sdk_17")
+    get_jdk_dependency("java.21-jdk","java_sdk_21")
+    get_jre_dependency("java.11-jre","jre_11")     
+    get_jre_dependency("java.17-jre","jre_17")
+    get_jre_dependency("java.21-jre","jre_21")        
 
-    # JDK 11 support by Docker Buildpack
-    jdk_dependency = get_dependency("java.11-jdk", "/opt/mendix/buildpack")
+# JDK 11, 17, 21 support by Docker Buildpack
+def get_jdk_dependency(jdk_version, jdk_destination_version):    
+    jdk_dependency = get_dependency(jdk_version, "/opt/mendix/buildpack")
     logging.debug("Creating symlink for jdk {0}".format(jdk_dependency['artifact']))
     jdk_cache_artifact = f"/tmp/buildcache/bust/{jdk_dependency['artifact']}"
-    jdk_destination = '/etc/alternatives/java_sdk_11'
+    jdk_destination = '/etc/alternatives/'+jdk_destination_version
     with tarfile.open(jdk_cache_artifact, "w:gz") as tar:
         # Symlinks to use jdk from host OS
         for jdk_dir in os.listdir(jdk_destination):
@@ -69,24 +76,13 @@ def replace_cf_dependencies():
             symlink.linkname = f"{jdk_destination}/{jdk_dir}"
             tar.addfile(symlink)
 
-    # JDK 17 support by Docker Buildpack
-    jdk_dependency = get_dependency("java.17-jdk", "/opt/mendix/buildpack")
-    logging.debug("Creating symlink for jdk {0}".format(jdk_dependency['artifact']))
-    jdk_cache_artifact = f"/tmp/buildcache/bust/{jdk_dependency['artifact']}"
-    jdk_destination = '/etc/alternatives/java_sdk_17'
-    with tarfile.open(jdk_cache_artifact, "w:gz") as tar:
-        # Symlinks to use jdk from host OS
-        for jdk_dir in os.listdir(jdk_destination):
-            symlink = tarfile.TarInfo(f"jdk/{jdk_dir}")
-            symlink.type = tarfile.SYMTYPE
-            symlink.linkname = f"{jdk_destination}/{jdk_dir}"
-            tar.addfile(symlink)
 
-    # JRE 11 support by Docker Buildpack
-    jre_dependency = get_dependency("java.11-jre", "/opt/mendix/buildpack")
+# JRE 11, 17, 21 support by Docker Buildpack
+def get_jre_dependency(jre_version, jre_destination_version):
+    jre_dependency = get_dependency(jre_version, "/opt/mendix/buildpack")
     logging.debug("Creating symlink for jre {0}".format(jre_dependency['artifact']))
     jre_cache_artifact = f"/tmp/buildcache/bust/{jre_dependency['artifact']}"
-    jre_destination = '/etc/alternatives/jre_11'
+    jre_destination = '/etc/alternatives/'+jre_destination_version
     with tarfile.open(jre_cache_artifact, "w:gz") as tar:
         # Symlinks to use jre from host OS
         for jre_dir in os.listdir(jre_destination):
@@ -95,18 +91,6 @@ def replace_cf_dependencies():
             symlink.linkname = f"{jre_destination}/{jre_dir}"
             tar.addfile(symlink)
 
-    # JRE 17 support by Docker Buildpack
-    jre_dependency = get_dependency("java.17-jre", "/opt/mendix/buildpack")
-    logging.debug("Creating symlink for jre {0}".format(jre_dependency['artifact']))
-    jre_cache_artifact = f"/tmp/buildcache/bust/{jre_dependency['artifact']}"
-    jre_destination = '/etc/alternatives/jre_17'
-    with tarfile.open(jre_cache_artifact, "w:gz") as tar:
-        # Symlinks to use jre from host OS
-        for jre_dir in os.listdir(jre_destination):
-            symlink = tarfile.TarInfo(f"jre/{jre_dir}")
-            symlink.type = tarfile.SYMTYPE
-            symlink.linkname = f"{jre_destination}/{jre_dir}"
-            tar.addfile(symlink)
 
 def call_buildpack_compilation():
     logging.debug("Executing call_buildpack_compilation...")
