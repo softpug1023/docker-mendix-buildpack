@@ -33,7 +33,7 @@ RUN rpm -ivh https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.
     microdnf clean all && rm -rf /var/cache/yum
 
 # Install RHEL alternatives to CF Buildpack dependencies
-RUN microdnf install -y java-11-openjdk-headless java-11-openjdk-devel tzdata-java mono-core-5.20.1.34 libgdiplus0 libicu && \
+RUN microdnf install -y java-11-openjdk-headless java-11-openjdk-devel java-17-openjdk-headless java-17-openjdk-devel java-21-openjdk-headless java-21-openjdk-devel tzdata-java mono-core-5.20.1.34 libgdiplus0 libicu && \
     microdnf clean all && rm -rf /var/cache/yum
 
 # Set nginx permissions
