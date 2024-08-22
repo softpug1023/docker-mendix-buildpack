@@ -1,0 +1,34 @@
+#!/bin/sh
+set -e
+
+# Required to allow using deprecated checksums
+export OPENSSL_ENABLE_SHA1_SIGNATURES=1
+export MONO_STRICT_MS_COMPLIANT=yes
+
+# Choose if mxbuild should run directly or from mono
+MXBUILD_COMMAND=/opt/mendix/modeler/mxbuild
+if [ ! -f $MXBUILD_COMMAND ]; then
+    MXBUILD_COMMAND="mono /opt/mendix/modeler/mxbuild.exe"
+fi
+
+cd /workdir
+
+if [ -f /workdir/project ]; then
+    JAVA_VERSION=$(cat java-version)
+elif [ -f /opt/mendix/modeler/mx ]; then
+    JAVA_VERSION=$(/opt/mendix/modeler/mx dump-mpr --unit-type 'Settings$ProjectSettings' /workdir/project/*.mpr | \
+         jq -r '.units[] | select(.["$Type"]=="Settings$ProjectSettings") | .["settingsParts"][] | select(.["$Type"]=="Settings$RuntimeSettings").javaVersion | if (. == null or . == "null") then "Java11" else . end')
+else
+    JAVA_VERSION=11
+fi
+
+JAVA_VERSION=$(echo -n $JAVA_VERSION| sed s/\^Java// | head)
+
+echo "Detected Java $JAVA_VERSION"
+export JDK_HOME=/etc/alternatives/java_sdk_${JAVA_VERSION}
+
+$MXBUILD_COMMAND \
+    --target=package \
+    --java-home=${JDK_HOME} --java-exe-path=${JDK_HOME}/bin/java \
+    --model-version=${MODEL_VERSION} \
+    --output=/workdir/output.mda /workdir/project/*.mpr

@@ -12,25 +12,17 @@ ENV USER_UID=${USER_UID}
 # Install common prerequisites
 RUN rpm -ivh https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm &&\
     microdnf update -y && \
-    microdnf install -y glibc-langpack-en openssl fontconfig tzdata-java libgdiplus libicu && \
+    microdnf install -y glibc-langpack-en openssl fontconfig tzdata-java libgdiplus libicu tar jq \
+        java-11-openjdk-devel java-17-openjdk-devel java-21-openjdk-devel && \
     microdnf clean all && rm -rf /var/cache/yum
-
-# Install Java if specified
-ARG JAVA_VERSION
-RUN if [ ! -z "$JAVA_VERSION" ]; then \
-    microdnf update -y && \
-    microdnf install -y java-${JAVA_VERSION}-openjdk-devel && \
-    microdnf clean all && rm -rf /var/cache/yum \
-    ; fi
-
-# Download or copy MxBuild
-ARG MXBUILD_ARCHIVE
-ADD $MXBUILD_ARCHIVE /opt/mendix/
-
-COPY --chmod=0755 mxbuild /opt/mendix/
 
 # Create user (for non-OpenShift clusters)
 RUN echo "mendix:x:${USER_UID}:${USER_UID}:mendix user:/workdir:/sbin/nologin" >> /etc/passwd
+
+# Download and extract MxBuild
+ARG MXBUILD_DOWNLOAD_URL
+RUN mkdir -p /opt/mendix && curl -sL $MXBUILD_DOWNLOAD_URL | tar -C /opt/mendix -xzf - --owner=root:0 --group=root:0 --mode='uga=rX'
+COPY --chown=0:0 --chmod=0755 build /opt/mendix/build
 
 # Prepare build context
 ENV HOME /workdir
@@ -41,4 +33,4 @@ RUN mkdir -p /workdir/project &&\
 
 USER $USER_UID
 
-ENTRYPOINT ["/opt/mendix/mxbuild"]
+ENTRYPOINT ["/opt/mendix/build"]
