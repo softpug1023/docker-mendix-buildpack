@@ -1,0 +1,19 @@
+#!/bin/sh
+set -e
+
+export JDK_HOME=/etc/alternatives/java_sdk
+# Required to allow using deprecated checksums
+export OPENSSL_ENABLE_SHA1_SIGNATURES=1
+
+# Choose if mxbuild should run directly or from mono
+MXBUILD_COMMAND=/opt/mendix/modeler/mxbuild
+if [ ! -f $MXBUILD_COMMAND ]; then
+    MXBUILD_COMMAND="mono /opt/mendix/modeler/mxbuild.exe"
+fi
+
+cd /workdir
+$MXBUILD_COMMAND \
+    --target=package \
+    --java-home=${JDK_HOME} --java-exe-path=${JDK_HOME}/bin/java \
+    --model-version=${MODEL_VERSION} \
+    --output=/opt/mendix/home/output.mda /workdir/project/*.mpr

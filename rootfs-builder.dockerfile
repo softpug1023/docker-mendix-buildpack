@@ -29,11 +29,11 @@ COPY --chown=0:0 scripts/mono/mono-centos8-stable.repo /etc/yum.repos.d/mono-cen
 RUN rpm -ivh https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm &&\
     microdnf update -y && \
     microdnf module enable nginx:1.20 -y && \
-    microdnf install -y wget curl glibc-langpack-en python311 openssl tar gzip unzip libpq nginx nginx-mod-stream binutils fontconfig findutils binutils && \
+    microdnf install -y wget curl glibc-langpack-en python311 openssl tar gzip unzip libpq nginx nginx-mod-stream binutils fontconfig findutils & \
     microdnf clean all && rm -rf /var/cache/yum
 
 # Install RHEL alternatives to CF Buildpack dependencies
-RUN microdnf install -y java-11-openjdk-headless java-11-openjdk-devel java-17-openjdk-headless java-17-openjdk-devel java-21-openjdk-headless java-21-openjdk-devel tzdata-java mono-core-5.20.1.34 libgdiplus0 libicu && \
+RUN microdnf install -y java-11-openjdk-headless java-17-openjdk-headless java-21-openjdk-headless tzdata-java mono-core-5.20.1.34 libgdiplus0 libicu && \
     microdnf clean all && rm -rf /var/cache/yum
 
 # Set nginx permissions
