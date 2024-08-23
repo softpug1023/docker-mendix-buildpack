@@ -45,24 +45,36 @@ def extract_zip(mda_file):
         zip_file.extractall(temp_dir.name)
     return temp_dir
 
+BUILDER_PROCESS = None
+def stop_processes():
+    if BUILDER_PROCESS is not None:
+        proc = BUILDER_PROCESS
+        proc.terminate()
+        proc.communicate()
+        proc.wait()
+
 def container_call(args):
     build_executables = ['podman', 'docker']
     build_executable = None
+    logger_stdout = None
+    logger_stderr = None
     for builder in build_executables:
-        builder = shutil.which(builder)
-        if builder is not None:
-            build_executable = builder
+        build_executable = shutil.which(builder)
+        if build_executable is not None:
+            logger_stderr = logging.getLogger(builder + '-stderr')
+            logger_stdout = logging.getLogger(builder + '-stdout')
             break
     if build_executable is None:
         raise Exception('Cannot find Podman or Docker executable')
     proc = subprocess.Popen([build_executable] + args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+    BUILDER_PROCESS = proc
 
     sel = selectors.DefaultSelector()
     sel.register(proc.stdout, selectors.EVENT_READ)
     sel.register(proc.stderr, selectors.EVENT_READ)
-    logger = logging.getLogger(build_executable)
 
-    last_line = None
+    last_line_stdout = None
+    last_line_stderr = None
     stderr_open, stderr_open = True, True
     while stderr_open or stderr_open:
         for key, _ in sel.select():
@@ -75,17 +87,41 @@ def container_call(args):
                 continue
             data = data.rstrip()
             if key.fileobj is proc.stdout:
-                last_line = data
-                logger.info(data)
+                last_line_stdout = data
+                logger_stdout.info(data)
             elif key.fileobj is proc.stderr:
-                logger.error(data)
+                last_line_stderr = data
+                # stderr is mostly used for progress notifications, not errors
+                logger_stderr.info(data)
 
     sel.close()
+    BUILDER_PROCESS = None
     if proc.wait() != 0:
-        raise Exception('Builder returned with error')
-    return last_line
+        raise Exception(f"Builder returned with error: {last_line_stderr}")
+    return last_line_stdout
 
-def build_mpr_builder(mx_version, dotnet):
+def pull_image(image_url):
+    try:
+        container_call(['image', 'pull', image_url])
+        return image_url
+    except:
+        return None
+
+def delete_container(container_id):
+    try:
+        container_call(['container', 'rm', '--force', container_id])
+    except Exception as e:
+        logging.warning('Failed to delete container {}: {}'.format(container_id, e))
+
+def build_mpr_builder(mx_version, dotnet, artifacts_repository=None):
+    builder_image_tag = f"mxbuild-{mx_version}-{dotnet}-{platform.machine()}"
+    builder_image_url = None
+    if artifacts_repository is not None:
+        builder_image_url = f"{artifacts_repository}:{builder_image_tag}"
+        image_hash = pull_image(builder_image_url)
+        if image_hash is not None:
+            return builder_image_url
+
     prefix = ''
     if platform.machine() == 'arm64' and dotnet == 'dotnet':
         prefix = 'arm64-'
@@ -93,49 +129,95 @@ def build_mpr_builder(mx_version, dotnet):
     mxbuild_filename = f"{prefix}mxbuild-{mx_version}.tar.gz"
     mxbuild_url = f"https://download.mendix.com/runtimes/{mxbuild_filename}"
 
-    # TODO: build image only if it doesn't exist yet
-    return container_call(['build',
-                                    '--build-arg', f"MXBUILD_DOWNLOAD_URL={mxbuild_url}",\
-                                    '--file', f"mxbuild/rootfs-mxbuild-{dotnet}.dockerfile",
-                                    'mxbuild'])
+    build_args = ['--build-arg', f"MXBUILD_DOWNLOAD_URL={mxbuild_url}",
+                  '--file', f"mxbuild/{dotnet}.dockerfile"]
+    if artifacts_repository is not None:
+        build_args += ['--tag', builder_image_url]
 
-def build_mpr(source_dir, mpr_file):
-    print(f"MPR file {mpr_file}")
+    image_id = container_call(['image', 'build'] + build_args + ['mxbuild'])
+    if artifacts_repository is not None:
+        try:
+            container_call(['image', 'push', builder_image_url])
+        except Exception as e:
+            logging.warning('Failed to push mxbuild into artifacts repository: {}; continuing with the build'.format(e))
+    return image_id
+
+def get_git_commit(source_dir):
+    git_head = os.path.join(source_dir, '.git', 'HEAD')
+    if not os.path.isfile(git_head):
+        return None
+    with open(git_head) as git_head:
+        git_head_line = git_head.readline().split()
+        if len(git_head_line) == 1:
+            # Detached commit
+            return git_head_line[0]
+        if len(git_head_line) > 2:
+            return Exception(f"Unsupported Git HEAD format {git_head_line}")
+        git_branch = git_head_line[1].split('/')
+        git_branch_file = os.path.join(*([source_dir, '.git'] + git_branch))
+        if not os.path.isfile(git_branch_file):
+            return Exception('Git branch file doesn\'t exist')
+        with open(git_branch_file) as git_branch_file:
+            return git_branch_file.readline()
+
+
+def build_mpr(source_dir, mpr_file, destination, artifacts_repository=None):
     cursor = sqlite3.connect(mpr_file).cursor()
     cursor.execute("SELECT _ProductVersion FROM _MetaData LIMIT 1")
     mx_version = cursor.fetchone()[0]
     mx_version_value = parse_version(mx_version)
-    logging.debug("Detected Mendix version {}".format(mx_version_value))
-    if mx_version_value >= (10, 0, 0, 0):
-        builder_image = build_mpr_builder(mx_version, 'dotnet')
-        build_result = container_call(['run', '--volume', os.path.abspath(source_dir)+':/workdir/project:rw', builder_image])
-    else:
-        builder_image = build_mpr_builder(mx_version, 'mono')
-        build_result = container_call(['run', '--volume', os.path.abspath(source_dir)+':/workdir/project:rw', builder_image])
-    raise Exception('TODO')
+    logging.debug('Detected Mendix version {}'.format('.'.join(map(str,mx_version_value))))
+    dotnet = 'dotnet' if mx_version_value >= (10, 0, 0, 0) else 'mono'
+    builder_image = build_mpr_builder(mx_version, dotnet, artifacts_repository)
+    model_version = get_git_commit(source_dir)
+    model_version = 'unversioned' if model_version is None else model_version
+
+    container_id = container_call(['container', 'create', builder_image, os.path.basename(mpr_file), model_version])
+    atexit.register(delete_container, container_id)
+    container_call(['container', 'cp', os.path.abspath(source_dir)+'/.', f"{container_id}:/workdir/project"])
+    build_result = container_call(['start', '--attach', '--interactive', container_id])
+
+    temp_dir = tempfile.TemporaryDirectory(prefix='mendix-docker-buildpack')
+    container_call(['container', 'cp', f"{container_id}:/workdir/output.mda", temp_dir.name])
+    with zipfile.ZipFile(os.path.join(temp_dir.name, 'output.mda')) as zip_file:
+        zip_file.extractall(destination)
 
 def parse_version(version):
     return tuple([ int(n) for n in version.split('.') ])
 
-def prepare_mda(source_dir):
-    mpk_file = find_default_file(source_dir, '.mpk')
+def prepare_destination(destination_path):
+    with os.scandir(destination_path) as entries:
+        for entry in entries:
+            if entry.is_dir() and not entry.is_symlink():
+                shutil.rmtree(entry.path)
+            else:
+                os.remove(entry.path)
+    project_path = os.path.join(destination_path, 'project')
+    os.mkdir(project_path, 0o755)
+    shutil.copytree('scripts', os.path.join(destination_path, 'scripts'))
+    shutil.copyfile('Dockerfile', os.path.join(destination_path, 'Dockerfile'))
+    return project_path
+
+def prepare_mda(source_path, destination_path, artifacts_repository=None):
+    destination_path = prepare_destination(destination_path)
+    mpk_file = find_default_file(source_path, '.mpk')
     extracted_dir = None
     if mpk_file is not None:
         extracted_dir = extract_zip(mpk_file)
-        source_dir = extracted_dir.name
-    mpr_file = find_default_file(source_dir, '.mpr')
+        source_path = extracted_dir.name
+    mpr_file = find_default_file(source_path, '.mpr')
     if mpr_file is not None:
-        return build_mpr(source_dir, mpr_file)
-    mda_file = find_default_file(source_dir, '.mda')
+        source_path = os.path.abspath(os.path.join(mpr_file, os.pardir))
+        return build_mpr(source_path, mpr_file, destination_path, artifacts_repository)
+    mda_file = find_default_file(source_path, '.mda')
     if mda_file is not None:
-        extracted_dir = extract_zip(mda_file)
-        source_dir = extracted_dir.name
-    extracted_mda_file = get_metadata_value(source_dir)
-    # TODO: pre-download MxRuntime & place into CF Buildpack's cache dir
+        with zipfile.ZipFile(mda_file) as zip_file:
+            zip_file.extractall(project_path)
+    extracted_mda_file = get_metadata_value(destination_path)
     if extracted_mda_file is not None:
-        return source_dir
+        return destination_path
     else:
-        raise Exception('No supported files found in source dir')
+        raise Exception('No supported files found in source path')
 
 def build_image(mda_dir):
     # TODO: build the full image, or just copy MDA into destination?
@@ -144,15 +226,22 @@ def build_image(mda_dir):
     mx_version = mda_metadata['RuntimeVersion']
     java_version = mda_metadata.get('JavaVersion', 11)
     print(mda_metadata['RuntimeVersion'])
+    print(mda_metadata['JavaVersion'])
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Build a Docker image of a Mendix app')
-    parser.add_argument('source_dir',  metavar='source_dir', type=pathlib.Path, help='Path to source Mendix app (MDA file, MPK file, MPR directory or extracted MDA directory)')
-
-    # TODO: allow to specify Podman args and replace URLs
+    parser = argparse.ArgumentParser(description='Build a Mendix app')
+    parser.add_argument('--source', metavar='source', required=True, nargs='?', type=pathlib.Path, help='Path to source Mendix app (MDA file, MPK file, MPR directory or extracted MDA directory)')
+    parser.add_argument('--destination', metavar='destination', required=True, nargs='?', type=pathlib.Path, help='Destination for MDA')
+    parser.add_argument('--artifacts-repository', required=False, nargs='?', metavar='artifacts_repository', type=str, help='Repository to use for caching build images')
+    parser.add_argument('action', metavar='action', choices=['build-mda'], help='Action to perform')
 
     args = parser.parse_args()
 
-    mda_dir = prepare_mda(args.source_dir)
-    build_image(mda_dir)
+    atexit.register(stop_processes)
+    try:
+        prepare_mda(args.source, args.destination, args.artifacts_repository)
+    except KeyboardInterrupt:
+        stop_processes()
+        raise
+    # build_image(args.destination)
 
