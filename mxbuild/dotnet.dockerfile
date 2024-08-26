@@ -30,6 +30,4 @@ RUN mkdir -p /workdir/project /workdir/output /workdir/.local/share/Mendix &&\
     chown -R ${USER_UID}:${USER_UID} /workdir &&\
     chmod -R 755 /workdir
 
-USER $USER_UID
-
 ENTRYPOINT ["/opt/mendix/build"]

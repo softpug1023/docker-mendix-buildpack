@@ -30,9 +30,13 @@ RUN if [ -f /usr/bin/python ] ; then rm /usr/bin/python; fi &&\
     ln -s /usr/bin/python3.11 /usr/bin/python
 
 # Create vcap home directory for Datadog configuration
-RUN mkdir -p /home/vcap /opt/datadog-agent/run &&\
-    chown -R ${USER_UID}:0 /home/vcap /opt/datadog-agent/run &&\
-    chmod -R g=u /home/vcap /opt/datadog-agent/run
+RUN mkdir -p /home /app/log /opt/mendix/build /opt/datadog-agent/run &&\
+    ln -s /opt/mendix/build /home/vcap &&\
+    chown -R ${USER_UID}:0 /home/vcap /opt/datadog-agent/run /app/log &&\
+    chmod -R g=u /home/vcap /opt/datadog-agent/run /app/log
+
+# Copy Cloud Foundry emulation scripts
+COPY --chmod=0755 --chown=0:0 scripts/host /usr/local/bin/
 
 # Prepare home directory and set permissions
 RUN mkdir -p /opt/mendix &&\

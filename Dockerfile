@@ -54,11 +54,22 @@ FROM ${ROOTFS_IMAGE}
 LABEL Author="Mendix Digital Ecosystems"
 LABEL maintainer="digitalecosystems@mendix.com"
 
+# Install Ruby if Datadog is detected
+ARG DD_API_KEY
+RUN if [ ! -z "$DD_API_KEY" ] ; then\
+    microdnf update -y && \
+    microdnf install -y ruby && \
+    microdnf clean all && rm -rf /var/cache/yum \
+    ; fi
+
 # Set the home path
 ENV HOME=/opt/mendix/build
 
 # Add the buildpack modules
 ENV PYTHONPATH "/opt/mendix/buildpack/lib/:/opt/mendix/buildpack/:/opt/mendix/buildpack/lib/python3.11/site-packages/"
+
+# Set the user ID
+ARG USER_UID=1001
 
 USER ${USER_UID}
 

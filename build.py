@@ -14,7 +14,6 @@ import sys
 import selectors
 import logging
 import platform
-import urllib.request
 
 logging.basicConfig(
     level=logging.INFO,
@@ -75,13 +74,13 @@ def container_call(args):
 
     last_line_stdout = None
     last_line_stderr = None
-    stderr_open, stderr_open = True, True
-    while stderr_open or stderr_open:
+    stdout_open, stderr_open = True, True
+    while stdout_open or stderr_open:
         for key, _ in sel.select():
             data = key.fileobj.readline()
             if data == '':
                 if key.fileobj is proc.stdout:
-                    stdin_open = False
+                    stdout_open = False
                 elif key.fileobj is proc.stderr:
                     stderr_open = False
                 continue
@@ -118,9 +117,11 @@ def build_mpr_builder(mx_version, dotnet, artifacts_repository=None):
     builder_image_url = None
     if artifacts_repository is not None:
         builder_image_url = f"{artifacts_repository}:{builder_image_tag}"
-        image_hash = pull_image(builder_image_url)
-        if image_hash is not None:
-            return builder_image_url
+        image_url = pull_image(builder_image_url)
+        if image_url is not None:
+            return image_url
+    else:
+        builder_image_url = f"mendix-buildpack:{builder_image_tag}"
 
     prefix = ''
     if platform.machine() == 'arm64' and dotnet == 'dotnet':
@@ -130,33 +131,32 @@ def build_mpr_builder(mx_version, dotnet, artifacts_repository=None):
     mxbuild_url = f"https://download.mendix.com/runtimes/{mxbuild_filename}"
 
     build_args = ['--build-arg', f"MXBUILD_DOWNLOAD_URL={mxbuild_url}",
-                  '--file', f"mxbuild/{dotnet}.dockerfile"]
-    if artifacts_repository is not None:
-        build_args += ['--tag', builder_image_url]
+                  '--file', os.path.join('mxbuild', f"{dotnet}.dockerfile"),
+                  '--tag', builder_image_url]
 
-    image_id = container_call(['image', 'build'] + build_args + ['mxbuild'])
+    container_call(['image', 'build'] + build_args + ['mxbuild'])
     if artifacts_repository is not None:
         try:
             container_call(['image', 'push', builder_image_url])
         except Exception as e:
             logging.warning('Failed to push mxbuild into artifacts repository: {}; continuing with the build'.format(e))
-    return image_id
+    return builder_image_url
 
 def get_git_commit(source_dir):
     git_head = os.path.join(source_dir, '.git', 'HEAD')
     if not os.path.isfile(git_head):
-        return None
+        raise Exception('Project source doesn\'t contain git metadata')
     with open(git_head) as git_head:
         git_head_line = git_head.readline().split()
         if len(git_head_line) == 1:
             # Detached commit
             return git_head_line[0]
         if len(git_head_line) > 2:
-            return Exception(f"Unsupported Git HEAD format {git_head_line}")
+            raise Exception(f"Unsupported Git HEAD format {git_head_line}")
         git_branch = git_head_line[1].split('/')
         git_branch_file = os.path.join(*([source_dir, '.git'] + git_branch))
         if not os.path.isfile(git_branch_file):
-            return Exception('Git branch file doesn\'t exist')
+            raise Exception('Git branch file doesn\'t exist')
         with open(git_branch_file) as git_branch_file:
             return git_branch_file.readline()
 
@@ -169,9 +169,12 @@ def build_mpr(source_dir, mpr_file, destination, artifacts_repository=None):
     logging.debug('Detected Mendix version {}'.format('.'.join(map(str,mx_version_value))))
     dotnet = 'dotnet' if mx_version_value >= (10, 0, 0, 0) else 'mono'
     builder_image = build_mpr_builder(mx_version, dotnet, artifacts_repository)
-    model_version = get_git_commit(source_dir)
-    model_version = 'unversioned' if model_version is None else model_version
-
+    model_version = None
+    try:
+        model_version = get_git_commit(source_dir)
+    except Exception as e:
+        model_version = 'unversioned'
+        logging.warning('Cannot determine git commit ({}), will set model version to unversioned'.format(e))
     container_id = container_call(['container', 'create', builder_image, os.path.basename(mpr_file), model_version])
     atexit.register(delete_container, container_id)
     container_call(['container', 'cp', os.path.abspath(source_dir)+'/.', f"{container_id}:/workdir/project"])
@@ -212,7 +215,9 @@ def prepare_mda(source_path, destination_path, artifacts_repository=None):
     mda_file = find_default_file(source_path, '.mda')
     if mda_file is not None:
         with zipfile.ZipFile(mda_file) as zip_file:
-            zip_file.extractall(project_path)
+            zip_file.extractall(destination_path)
+    elif os.path.isdir(source_path):
+        shutil.copytree(source_path, destination_path, dirs_exist_ok=True)
     extracted_mda_file = get_metadata_value(destination_path)
     if extracted_mda_file is not None:
         return destination_path
@@ -225,15 +230,14 @@ def build_image(mda_dir):
     mda_metadata = get_metadata_value(mda_path)
     mx_version = mda_metadata['RuntimeVersion']
     java_version = mda_metadata.get('JavaVersion', 11)
-    print(mda_metadata['RuntimeVersion'])
-    print(mda_metadata['JavaVersion'])
+    logging.debug("Detected Mendix {} Java {}".format(mx_version, java_version))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Build a Mendix app')
     parser.add_argument('--source', metavar='source', required=True, nargs='?', type=pathlib.Path, help='Path to source Mendix app (MDA file, MPK file, MPR directory or extracted MDA directory)')
     parser.add_argument('--destination', metavar='destination', required=True, nargs='?', type=pathlib.Path, help='Destination for MDA')
     parser.add_argument('--artifacts-repository', required=False, nargs='?', metavar='artifacts_repository', type=str, help='Repository to use for caching build images')
-    parser.add_argument('action', metavar='action', choices=['build-mda'], help='Action to perform')
+    parser.add_argument('action', metavar='action', choices=['build-mda-dir'], help='Action to perform')
 
     args = parser.parse_args()
 
@@ -244,4 +248,3 @@ if __name__ == '__main__':
         stop_processes()
         raise
     # build_image(args.destination)
-
