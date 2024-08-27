@@ -42,6 +42,7 @@ This project is a goto reference for the following scenarios :
 * Docker 20.10 (Installation [here](https://docs.docker.com/engine/installation/))
   * Earlier Docker versions are no longer compatible because they don't support multistage builds.
     To use Docker versions below 20.10, download an earlier Mendix Docker Buildpack release, such as [v2.3.2](https://github.com/mendix/docker-mendix-buildpack/releases/tag/v2.3.2)
+* Python 3
 * For preparing, a local installation of `curl`
 * For local testing, make sure you can run the [docker-compose command](https://docs.docker.com/compose/install/)
 * A Mendix app based on Mendix 8 or a later version
@@ -86,7 +87,35 @@ When building the the `rootfs-builder.dockerfile` file, you can provide the foll
 - **CF_BUILDPACK_URL** specifies the URL where the CF buildpack should be downloaded from (for example, a local mirror). Defaults to `https://github.com/mendix/cf-mendix-buildpack/releases/download/${CF_BUILDPACK}/cf-mendix-buildpack.zip`. Specifying **CF_BUILDPACK_URL** will override the version from **CF_BUILDPACK**.
 - **BUILDPACK_XTRACE** can be used to enable CF Buildpack [debug logging](https://github.com/mendix/cf-mendix-buildpack#logging-and-debugging). Set this variable to `true` to enable debug logging.
 
-### Compile an app
+### Compile an MDA
+
+If your app is a source MPK file, an MPR project directory or a compressed MDA file, it needs to be converted or compiled into a format supported by CF Buildpack - an extracted MDA file.
+
+This feature is available in Docker Buildpack version v5.1.0 and later, and is intended to allow building Mendix 10 apps in custom CI/CD pipelines.
+
+To do this, run:
+
+```shell
+./build.py --source <path-to-source> --destination <destination-dir> build-mda-dir
+```
+
+where:
+
+- **--source** is the path to the project source, such as a project directory (with a source MPR project) or an MPK file.
+- **--destination** is a path to an empty directory where the script should output the build result. This directory will contain
+  * a compiled, extracted MDA file - in a subdirectory called `project`.
+  * a copy of the `Dockerfile` and the `scripts` directory.
+- **--artifacts-repository** - an optional repository to cache MxBuild and Mono build images, for example `quay.io/example/mxbuild-artifacts`. By enabling this option, the `build.py` script will try to use a prebuilt image from this repository if available.
+
+After the `build.py` script completes, you can proceed with building the app image by running the following command (see next section for more details):
+
+```shell
+docker build --tag mendix/mendix-buildpack:v1.2 <destination-dir>
+```
+
+where `<destination-dir>` is the same as used when calling `build.py`.
+
+### Build an image from an MDA
 
 Before running the container, it is necessary to build the image with your application. This buildpack contains Dockerfile with a script that will compile your application using [cf-mendix-buildpack](https://github.com/mendix/cf-mendix-buildpack/).
 
