@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eux
 docker version
-docker-compose version
+docker compose version
 
 echo "Downloading test project"
 mkdir -p downloads
