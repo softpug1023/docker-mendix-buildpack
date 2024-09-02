@@ -6,7 +6,7 @@ COMPOSEFILE=$1
 TIMEOUT=180s
 
 echo "test.sh [TEST STARTED] starting docker-compose $COMPOSEFILE"
-docker-compose -f $COMPOSEFILE up &
+docker compose -f $COMPOSEFILE up &
 
 timeout $TIMEOUT bash -c 'until curl -s http://localhost:8080 | grep "<title>Mendix</title>"; do sleep 5; done'
 
@@ -17,5 +17,5 @@ if [ $RETURN_CODE -eq "0" ]; then
 else
   echo "test.sh [TEST FAILED] App is not reachable in timeout delay $TIMEOUT for $COMPOSEFILE"
 fi
-docker-compose -f $COMPOSEFILE kill
+docker compose -f $COMPOSEFILE kill
 exit $RETURN_CODE

@@ -1,6 +1,6 @@
 # Dockerfile to create a Mendix Docker image based on either the source code or
 # Mendix Deployment Archive (aka mda file)
-FROM --platform=linux/amd64 registry.access.redhat.com/ubi8/ubi-minimal:latest
+FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
 #This version does a full build originating from the Ubuntu Docker images
 LABEL Author="Mendix Digital Ecosystems"
 LABEL maintainer="digitalecosystems@mendix.com"
@@ -10,42 +10,34 @@ ENV LANG C.UTF-8
 ENV LC_ALL C.UTF-8
 
 # CF buildpack version
-ARG CF_BUILDPACK=v5.0.16
+ARG CF_BUILDPACK=v5.0.20
 # CF buildpack download URL
 ARG CF_BUILDPACK_URL=https://github.com/mendix/cf-mendix-buildpack/releases/download/${CF_BUILDPACK}/cf-mendix-buildpack.zip
+
+# Allow specification of debugging options
+ARG BUILDPACK_XTRACE
+
+# install dependencies & remove package lists
+RUN microdnf update -y && \
+    microdnf module enable nginx:1.24 -y && \
+    microdnf install -y wget glibc-langpack-en python311 openssl tar gzip unzip libpq nginx nginx-mod-stream binutils fontconfig findutils java-11-openjdk-headless java-17-openjdk-headless java-21-openjdk-headless && \
+    microdnf remove -y /usr/bin/python && \
+    microdnf clean all && rm -rf /var/cache/yum
 
 # Set the user ID
 ARG USER_UID=1001
 ENV USER_UID=${USER_UID}
 
-# Allow specification of debugging options
-ARG BUILDPACK_XTRACE
-
-# Add mono repo
-COPY --chown=0:0 scripts/mono/xamarin.gpg /etc/pki/rpm-gpg/RPM-GPG-KEY-mono-centos8-stable
-COPY --chown=0:0 scripts/mono/mono-centos8-stable.repo /etc/yum.repos.d/mono-centos8-stable.repo
-
-# install dependencies & remove package lists
-RUN rpm -ivh https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm &&\
-    microdnf update -y && \
-    microdnf module enable nginx:1.20 -y && \
-    microdnf install -y wget curl glibc-langpack-en python311 openssl tar gzip unzip libpq nginx nginx-mod-stream binutils fontconfig findutils binutils && \
-    microdnf clean all && rm -rf /var/cache/yum
-
-# Install RHEL alternatives to CF Buildpack dependencies
-RUN microdnf install -y java-11-openjdk-headless java-11-openjdk-devel java-17-openjdk-headless java-17-openjdk-devel java-21-openjdk-headless java-21-openjdk-devel tzdata-java mono-core-5.20.1.34 libgdiplus0 libicu && \
-    microdnf clean all && rm -rf /var/cache/yum
-
 # Set nginx permissions
 RUN touch /run/nginx.pid && \
-    chown -R 1001:0 /var/log/nginx /var/lib/nginx /run/nginx.pid &&\
-    chmod -R g=u /var/log/nginx /var/lib/nginx /run/nginx.pid
+    chown -R ${USER_UID}:0 /var/log/nginx /var/lib/nginx /run &&\
+    chmod -R g=u /var/log/nginx /var/lib/nginx /run
 
-# Pretend to be Ubuntu to bypass CF Buildpack's check
-RUN rm /etc/*-release && printf 'NAME="Ubuntu"\nID=ubuntu\nVersion="22.04 LTS (Jammy Jellyfish)"\nVERSION_CODENAME=jammy\n' > /etc/os-release
-
-# Set python alias to python3 (required for Datadog)
-RUN alternatives --set python /usr/bin/python3
+# Set python alias to Python 3.11 to avoid using Java version
+RUN if [ -f /usr/bin/python ] ; then rm /usr/bin/python; fi &&\
+    if [ -f /usr/bin/python3 ] ; then rm /usr/bin/python3 ; fi &&\
+    ln -s /usr/bin/python3.11 /usr/bin/python3 &&\
+    ln -s /usr/bin/python3.11 /usr/bin/python
 
 # Download and prepare CF Buildpack
 
@@ -69,14 +61,16 @@ RUN mkdir -p /opt/mendix/buildpack /opt/mendix/build &&\
     chmod -R g=u /opt/mendix
 
 # Copy python scripts which execute the buildpack (exporting the VCAP variables)
-COPY scripts/compilation.py scripts/git scripts/mono-adapter /opt/mendix/buildpack/
+COPY scripts/compilation.py /opt/mendix/buildpack/
 
 # Install the buildpack Python dependencies
 RUN PYTHON_BUILD_RPMS="python3.11-pip python3.11-devel libffi-devel gcc" && \
     microdnf install -y $PYTHON_BUILD_RPMS && \
+    mkdir -p  /home/vcap/.local/bin/ && \
+    if [ ! -f /home/vcap/.local/bin/pip ] ; then ln -s /usr/bin/pip3.11 /home/vcap/.local/bin/pip ; fi && \
     rm /opt/mendix/buildpack/vendor/wheels/* && \
     chmod +rx /opt/mendix/buildpack/bin/bootstrap-python && /opt/mendix/buildpack/bin/bootstrap-python /opt/mendix/buildpack /tmp/buildcache && \
     microdnf remove -y $PYTHON_BUILD_RPMS && microdnf clean all && rm -rf /var/cache/yum
 
 # Add the buildpack modules
-ENV PYTHONPATH "$PYTHONPATH:/opt/mendix/buildpack/lib/:/opt/mendix/buildpack/:/opt/mendix/buildpack/lib/python3.11/site-packages/"
+ENV PYTHONPATH "$PYTHONPATH:/opt/mendix/buildpack/lib/:/opt/mendix/buildpack/:/opt/mendix/buildpack/lib/python3.11/site-packages"

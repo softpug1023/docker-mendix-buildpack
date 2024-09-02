@@ -10,13 +10,13 @@ on:
 
 jobs:
 
-  test-ubi8:
-    name: Test with a ubi8 rootfs
+  test-ubi9:
+    name: Test with a ubi9 rootfs
     runs-on: ubuntu-latest
 
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       # Run the integration test script
       - name: Run integration tests

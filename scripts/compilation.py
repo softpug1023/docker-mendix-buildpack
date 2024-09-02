@@ -37,45 +37,9 @@ def replace_cf_dependencies():
     mx_version = runtime.get_runtime_version("/opt/mendix/build")
     logging.debug("Detected Mendix version {0}".format(mx_version))
 
-    # Only mono 5 is supported by Docker Buildpack
-    mono_dependency = get_dependency("mono.5-jammy", "/opt/mendix/buildpack")
-    logging.debug("Creating symlink for mono {0}".format(mono_dependency['artifact']))
-
-    util.mkdir_p("/tmp/buildcache/bust")
-    mono_cache_artifact = f"/tmp/buildcache/bust/mono-{mono_dependency['version']}-mx-ubuntu-jammy.tar.gz"
-    with tarfile.open(mono_cache_artifact, "w:gz") as tar:
-        if mx_version.major >= 10:
-            # Mono is not needed for Mendix 10, use the bash adapter script
-            symlinks = {'mono/bin/mono':'/opt/mendix/buildpack/mono-adapter', 'mono/lib': '/usr/lib64'}
-        else:
-            # Symlinks to use mono from host OS
-            symlinks = {'mono/bin':'/usr/bin', 'mono/lib': '/usr/lib64', 'mono/etc': '/etc'}
-        for source, destination in symlinks.items():
-            symlink = tarfile.TarInfo(source)
-            symlink.type = tarfile.SYMTYPE
-            symlink.linkname = destination
-            tar.addfile(symlink)
-    get_jdk_dependency("java.11-jdk","java_sdk_11")
-    get_jdk_dependency("java.17-jdk","java_sdk_17")
-    get_jdk_dependency("java.21-jdk","java_sdk_21")
     get_jre_dependency("java.11-jre","jre_11")     
     get_jre_dependency("java.17-jre","jre_17")
     get_jre_dependency("java.21-jre","jre_21")        
-
-# JDK 11, 17, 21 support by Docker Buildpack
-def get_jdk_dependency(jdk_version, jdk_destination_version):    
-    jdk_dependency = get_dependency(jdk_version, "/opt/mendix/buildpack")
-    logging.debug("Creating symlink for jdk {0}".format(jdk_dependency['artifact']))
-    jdk_cache_artifact = f"/tmp/buildcache/bust/{jdk_dependency['artifact']}"
-    jdk_destination = '/etc/alternatives/'+jdk_destination_version
-    with tarfile.open(jdk_cache_artifact, "w:gz") as tar:
-        # Symlinks to use jdk from host OS
-        for jdk_dir in os.listdir(jdk_destination):
-            symlink = tarfile.TarInfo(f"jdk/{jdk_dir}")
-            symlink.type = tarfile.SYMTYPE
-            symlink.linkname = f"{jdk_destination}/{jdk_dir}"
-            tar.addfile(symlink)
-
 
 # JRE 11, 17, 21 support by Docker Buildpack
 def get_jre_dependency(jre_version, jre_destination_version):
