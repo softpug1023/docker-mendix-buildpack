@@ -175,7 +175,7 @@ def build_mpr(source_dir, mpr_file, destination, artifacts_repository=None):
     except Exception as e:
         model_version = 'unversioned'
         logging.warning('Cannot determine git commit ({}), will set model version to unversioned'.format(e))
-    container_id = container_call(['container', 'create', builder_image, os.path.basename(mpr_file), model_version])
+    container_id = container_call(['container', 'create', builder_image, "/workdir/project/" + os.path.basename(mpr_file), model_version])
     atexit.register(delete_container, container_id)
     container_call(['container', 'cp', os.path.abspath(source_dir)+'/.', f"{container_id}:/workdir/project"])
     build_result = container_call(['start', '--attach', '--interactive', container_id])

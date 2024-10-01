@@ -33,4 +33,4 @@ $MXBUILD_COMMAND \
     --target=package \
     --java-home=${JDK_HOME} --java-exe-path=${JDK_HOME}/bin/java \
     --model-version=${MODEL_VERSION} \
-    --output=/workdir/output.mda /workdir/project/${MPR_FILENAME}
+    --output="/workdir/output.mda /workdir/project/${MPR_FILENAME}"
