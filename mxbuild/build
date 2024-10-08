@@ -18,7 +18,7 @@ cd /workdir
 if [ -f /workdir/project ]; then
     JAVA_VERSION=$(cat java-version)
 elif [ -f /opt/mendix/modeler/mx ]; then
-    JAVA_VERSION=$(/opt/mendix/modeler/mx dump-mpr --unit-type 'Settings$ProjectSettings' /workdir/project/${MPR_FILENAME} | \
+    JAVA_VERSION=$(/opt/mendix/modeler/mx dump-mpr --unit-type 'Settings$ProjectSettings' /workdir/project/"${MPR_FILENAME}" | \
          jq -r '.units[] | select(.["$Type"]=="Settings$ProjectSettings") | .["settingsParts"][] | select(.["$Type"]=="Settings$RuntimeSettings").javaVersion | if (. == null or . == "null") then "Java11" else . end')
 else
     JAVA_VERSION=11
@@ -33,4 +33,4 @@ $MXBUILD_COMMAND \
     --target=package \
     --java-home=${JDK_HOME} --java-exe-path=${JDK_HOME}/bin/java \
     --model-version=${MODEL_VERSION} \
-    --output=/workdir/output.mda /workdir/project/${MPR_FILENAME}
+    --output=/workdir/output.mda /workdir/project/"${MPR_FILENAME}"
