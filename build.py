@@ -189,12 +189,15 @@ def parse_version(version):
     return tuple([ int(n) for n in version.split('.') ])
 
 def prepare_destination(destination_path):
-    with os.scandir(destination_path) as entries:
-        for entry in entries:
-            if entry.is_dir() and not entry.is_symlink():
-                shutil.rmtree(entry.path)
-            else:
-                os.remove(entry.path)
+    if os.path.exists(destination_path):
+        with os.scandir(destination_path) as entries:
+            for entry in entries:
+                if entry.is_dir() and not entry.is_symlink():
+                    shutil.rmtree(entry.path)
+                else:
+                    os.remove(entry.path)
+    else:
+        os.makedirs(destination_path, 0o755)
     project_path = os.path.join(destination_path, 'project')
     os.mkdir(project_path, 0o755)
     shutil.copytree('scripts', os.path.join(destination_path, 'scripts'))
