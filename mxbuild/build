@@ -15,18 +15,28 @@ fi
 
 cd /workdir
 
-if [ -f /workdir/project ]; then
-    JAVA_VERSION=$(cat java-version)
+if [ -f /workdir/project/java-version ]; then
+    echo "Using java-version to select Java version"
+    JAVA_VERSION=$(cat /workdir/project/java-version)
 elif [ -f /opt/mendix/modeler/mx ]; then
-    JAVA_VERSION=$(/opt/mendix/modeler/mx dump-mpr --unit-type 'Settings$ProjectSettings' /workdir/project/"${MPR_FILENAME}" | \
-         jq -r '.units[] | select(.["$Type"]=="Settings$ProjectSettings") | .["settingsParts"][] | select(.["$Type"]=="Settings$RuntimeSettings").javaVersion | if (. == null or . == "null") then "Java11" else . end')
+    if JAVA_VERSION=$(/opt/mendix/modeler/mx show-java-version /workdir/project/"${MPR_FILENAME}"); then
+        echo "Using mx show-java-version to select Java version"
+    elif JAVA_VERSION=$(PROJECT_SETTINGS=`/opt/mendix/modeler/mx dump-mpr --unit-type 'Settings$ProjectSettings' /workdir/project/"${MPR_FILENAME}"` && \
+        echo -n $PROJECT_SETTINGS | \
+        jq -r '.units[] | select(.["$Type"]=="Settings$ProjectSettings") | .["settingsParts"][] | select(.["$Type"]=="Settings$RuntimeSettings").javaVersion | if (. == null or . == "null") then "Java11" else . end'); then
+        echo "Using mx dump-mpr to select Java version"
+    else
+        echo "Unable to detect Java version using mx tool"
+        JAVA_VERSION=11
+    fi
 else
+    echo "mx tool is not available"
     JAVA_VERSION=11
 fi
 
 JAVA_VERSION=$(echo -n $JAVA_VERSION| sed s/\^Java// | head)
 
-echo "Detected Java $JAVA_VERSION"
+echo "Using Java $JAVA_VERSION"
 export JDK_HOME=/etc/alternatives/java_sdk_${JAVA_VERSION}
 
 $MXBUILD_COMMAND \
