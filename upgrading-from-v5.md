@@ -7,6 +7,8 @@ If your CI/CD pipeline uses Docker Buildpack to build \*.mda files (compiled Men
 
 If you're upgrading from Docker Buildpack v4 (or an older version), you'll also need to follow the [upgrading from Docker Buildpack v4](upgrading-from-v4.md) instructions.
 
+⚠️ If your current pipeline is failing with an _Only Ubuntu is supported_ error, your pipeline depends on CF Buildpack to build Mendix MPR files, and needs to be updated as described in this document.
+
 ## Using the build.py script
 
 Docker Buildpack v6 no longer uses CF Buildpack to compile MPR (or MPK) files - to continue supporting newer versions of Mendix, Java and the base OS.
