@@ -43,7 +43,7 @@ This project is a goto reference for the following scenarios :
   * Earlier Docker versions are no longer compatible because they don't support multistage builds.
     To use Docker versions below 20.10, download an earlier Mendix Docker Buildpack release, such as [v2.3.2](https://github.com/mendix/docker-mendix-buildpack/releases/tag/v2.3.2)
   * Alternatively, Podman version 5 or later
-* Python 3.8
+* Python 3, version 3.8 or later
   * No additional dependencies are needed
 * A UNIX-like operating system, such as Linux or macOS, or Windows Subsystem for Linux
 * An x86-64 (AMD64) based CPU
@@ -126,7 +126,6 @@ Before running the container, it is necessary to build the image with your appli
 
 ```
 docker build \
-  --build-arg BUILD_PATH=<mendix-project-location> \
   --tag mendix/mendix-buildpack:v1.2 .
 ```
 
