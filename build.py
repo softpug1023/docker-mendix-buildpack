@@ -227,14 +227,6 @@ def prepare_mda(source_path, destination_path, artifacts_repository=None):
     else:
         raise Exception('No supported files found in source path')
 
-def build_image(mda_dir):
-    # TODO: build the full image, or just copy MDA into destination?
-    mda_path = mda_dir.name if isinstance(mda_dir, tempfile.TemporaryDirectory) else mda_dir
-    mda_metadata = get_metadata_value(mda_path)
-    mx_version = mda_metadata['RuntimeVersion']
-    java_version = mda_metadata.get('JavaVersion', 11)
-    logging.debug("Detected Mendix {} Java {}".format(mx_version, java_version))
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Build a Mendix app')
     parser.add_argument('--source', metavar='source', required=True, nargs='?', type=pathlib.Path, help='Path to source Mendix app (MDA file, MPK file, MPR directory or extracted MDA directory)')
@@ -250,4 +242,3 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         stop_processes()
         raise
-    # build_image(args.destination)
