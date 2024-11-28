@@ -4,7 +4,7 @@
 
 The Mendix Buildpack for Docker (aka docker-mendix-buildpack) is an **example project** you can use to build and run your Mendix Application in a [Docker](https://www.docker.com/) container.
 
-**⚠️ Warning** If your pipeline is based on Docker Buildpack V4 or an earlier version, see the [upgrading from Docker Buildpack v4](upgrading-from-v4.md) document. To use Docker Buildpack v5, some changes will be required in your build process.
+**⚠️ Warning** If your pipeline is based on Docker Buildpack v5 or an earlier version, see the [upgrading from Docker Buildpack v5](upgrading-from-v6.md) document. To use Docker Buildpack v6, some changes will be required in your build process.
 
 For a Kubernetes native solution to run Mendix apps, see [Mendix for Private Cloud](https://www.mendix.com/evaluation-guide/app-lifecycle/mendix-for-private-cloud/).
 
@@ -42,8 +42,14 @@ This project is a goto reference for the following scenarios :
 * Docker 20.10 (Installation [here](https://docs.docker.com/engine/installation/))
   * Earlier Docker versions are no longer compatible because they don't support multistage builds.
     To use Docker versions below 20.10, download an earlier Mendix Docker Buildpack release, such as [v2.3.2](https://github.com/mendix/docker-mendix-buildpack/releases/tag/v2.3.2)
-* Python 3.8
-* For preparing, a local installation of `curl`
+  * Alternatively, Podman version 5 or later
+* Python 3, version 3.8 or later
+  * No additional dependencies are needed
+  * In Windows, only Python running in Windows Subsystem for Linux is supported
+* A UNIX-like operating system, such as Linux or macOS, or Windows Subsystem for Linux
+* An x86-64 (AMD64) based CPU
+  * ARM64 CPUs are not fully supported
+* For running the example tests, a local installation of `curl`
 * For local testing, make sure you can run the [docker-compose command](https://docs.docker.com/compose/install/)
 * A Mendix app based on Mendix 8 or a later version
 
@@ -52,7 +58,7 @@ This project is a goto reference for the following scenarios :
 ### Preparation: rootfs
 
 To save build time, the build pack needs a prebuilt rootfs containing the base OS and additional packages.
-This rootfs is based on [Red Hat Universal Base Image 8 minimal](https://developers.redhat.com/articles/ubi-faq) image.
+This rootfs is based on [Red Hat Universal Base Image 9 minimal](https://developers.redhat.com/articles/ubi-faq) image.
 
 To build the rootfs, run the following commands
 
@@ -83,7 +89,7 @@ docker push <app-root-fs-image-tag>
 
 When building the the `rootfs-builder.dockerfile` file, you can provide the following additional arguments:
 
-- **CF_BUILDPACK** is a version of CloudFoundry buildpack. Defaults to `v5.0.16`. For stable pipelines, it's recommended to use a fixed **v5.0.16** version. Other Cloud Foundry buildpacks might not work with this version of Docker Buildpack.
+- **CF_BUILDPACK** is a version of CloudFoundry buildpack. Defaults to `v5.0.23`. For stable pipelines, it's recommended to use a fixed **v5.0.23** version. Other Cloud Foundry buildpacks might not work with this version of Docker Buildpack.
 - **CF_BUILDPACK_URL** specifies the URL where the CF buildpack should be downloaded from (for example, a local mirror). Defaults to `https://github.com/mendix/cf-mendix-buildpack/releases/download/${CF_BUILDPACK}/cf-mendix-buildpack.zip`. Specifying **CF_BUILDPACK_URL** will override the version from **CF_BUILDPACK**.
 - **BUILDPACK_XTRACE** can be used to enable CF Buildpack [debug logging](https://github.com/mendix/cf-mendix-buildpack#logging-and-debugging). Set this variable to `true` to enable debug logging.
 
@@ -91,7 +97,7 @@ When building the the `rootfs-builder.dockerfile` file, you can provide the foll
 
 If your app is a source MPK file, an MPR project directory or a compressed MDA file, it needs to be converted or compiled into a format supported by CF Buildpack - an extracted MDA file.
 
-This feature is available in Docker Buildpack version v5.1.0 and later, and is intended to allow building Mendix 10 apps in custom CI/CD pipelines.
+This feature is available in Docker Buildpack version v6.0.0 and later, and is intended to allow building Mendix 8, 9 and 10 apps in custom CI/CD pipelines.
 
 To do this, run:
 
@@ -121,13 +127,12 @@ Before running the container, it is necessary to build the image with your appli
 
 ```
 docker build \
-  --build-arg BUILD_PATH=<mendix-project-location> \
   --tag mendix/mendix-buildpack:v1.2 .
 ```
 
 For build you can provide next arguments:
 
-- **BUILD_PATH** indicates where the application model is located. It is a root directory of an unzipped .MDA or .MPK file. In the latter case, this is the directory where your .MPR file is located. Must be within [build context](https://docs.docker.com/engine/reference/commandline/build/#extended-description). Defaults to `./project`.
+- **BUILD_PATH** indicates where the application model is located. It is a root directory of an unzipped .MDA or .MPK file. In the latter case, this is the directory where your .MPR file is located. Must be within [build context](https://docs.docker.com/engine/reference/commandline/build/#extended-description). Should not be used when using the `build.py` script. Defaults to `./project`.
 - **ROOTFS_IMAGE** is a type of rootfs image. Defaults to `mendix-rootfs:app` (a locally prebuilt image).
 - **BUILDER_ROOTFS_IMAGE** is a type of rootfs image used for downloading the Mendix app dependencies and compiling the Mendix app from source. Defaults to `mendix-rootfs:builder` (a locally prebuilt image).
 - **EXCLUDE_LOGFILTER** will exclude the `mendix-logfilter` binary from the resulting Docker image if set to `true`. Defaults to `true`. Excluding `mendix-logfilter` will reduce the image size and remove a component that's not commonly used; the `LOG_RATELIMIT` environment variable option will be disabled.
@@ -398,9 +403,7 @@ Contributions are welcomed:
 
 ### Build Details
 
-This was built with the following:
-
-* Docker version 20.10
+Docker Buildpack is tested by running a Github Actions pipeline.
 
 ### Versioning
 

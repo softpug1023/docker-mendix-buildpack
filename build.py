@@ -189,12 +189,15 @@ def parse_version(version):
     return tuple([ int(n) for n in version.split('.') ])
 
 def prepare_destination(destination_path):
-    with os.scandir(destination_path) as entries:
-        for entry in entries:
-            if entry.is_dir() and not entry.is_symlink():
-                shutil.rmtree(entry.path)
-            else:
-                os.remove(entry.path)
+    if os.path.exists(destination_path):
+        with os.scandir(destination_path) as entries:
+            for entry in entries:
+                if entry.is_dir() and not entry.is_symlink():
+                    shutil.rmtree(entry.path)
+                else:
+                    os.remove(entry.path)
+    else:
+        os.makedirs(destination_path, 0o755)
     project_path = os.path.join(destination_path, 'project')
     os.mkdir(project_path, 0o755)
     shutil.copytree('scripts', os.path.join(destination_path, 'scripts'))
@@ -224,14 +227,6 @@ def prepare_mda(source_path, destination_path, artifacts_repository=None):
     else:
         raise Exception('No supported files found in source path')
 
-def build_image(mda_dir):
-    # TODO: build the full image, or just copy MDA into destination?
-    mda_path = mda_dir.name if isinstance(mda_dir, tempfile.TemporaryDirectory) else mda_dir
-    mda_metadata = get_metadata_value(mda_path)
-    mx_version = mda_metadata['RuntimeVersion']
-    java_version = mda_metadata.get('JavaVersion', 11)
-    logging.debug("Detected Mendix {} Java {}".format(mx_version, java_version))
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Build a Mendix app')
     parser.add_argument('--source', metavar='source', required=True, nargs='?', type=pathlib.Path, help='Path to source Mendix app (MDA file, MPK file, MPR directory or extracted MDA directory)')
@@ -247,4 +242,3 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         stop_processes()
         raise
-    # build_image(args.destination)
