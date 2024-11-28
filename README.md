@@ -45,6 +45,7 @@ This project is a goto reference for the following scenarios :
   * Alternatively, Podman version 5 or later
 * Python 3, version 3.8 or later
   * No additional dependencies are needed
+  * In Windows, only Python running in Windows Subsystem for Linux is supported
 * A UNIX-like operating system, such as Linux or macOS, or Windows Subsystem for Linux
 * An x86-64 (AMD64) based CPU
   * ARM64 CPUs are not fully supported
