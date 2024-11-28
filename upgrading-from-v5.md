@@ -14,7 +14,7 @@ If you're upgrading from Docker Buildpack v4 (or an older version), you'll also 
 Docker Buildpack v6 no longer uses CF Buildpack to compile MPR (or MPK) files - to continue supporting newer versions of Mendix, Java and the base OS.
 Instead, a custom `build.py` script will:
 
-1. Prepare a clean [Docker context](https://docs.docker.com/build/concepts/context/) in the path specified by `--destination`. All files required to build the app image will be copied to this destination.
+1. Prepare a clean [Docker context](https://docs.docker.com/build/concepts/context/) in the path specified by `--destination`. All files required to build the app image will be copied to this destination. If the directory doesn't exist, the `build.py` script will create it; if the directory is not empty, `build.py` will delete its contents.
 2. Detect the file type of the source path specified by the `--source` arg (an MPK file, an MPR file, an MDA file or an unpacked MDA directory).
 3. If necessary (`--source` specifies project that needs to be compiled)
    1. Create an image containing [mxbuild](https://docs.mendix.com/refguide/mxbuild/) and its dependencies.

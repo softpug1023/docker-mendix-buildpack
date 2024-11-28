@@ -97,7 +97,7 @@ When building the the `rootfs-builder.dockerfile` file, you can provide the foll
 
 If your app is a source MPK file, an MPR project directory or a compressed MDA file, it needs to be converted or compiled into a format supported by CF Buildpack - an extracted MDA file.
 
-This feature is available in Docker Buildpack version v5.1.0 and later, and is intended to allow building Mendix 10 apps in custom CI/CD pipelines.
+This feature is available in Docker Buildpack version v6.0.0 and later, and is intended to allow building Mendix 8, 9 and 10 apps in custom CI/CD pipelines.
 
 To do this, run:
 
