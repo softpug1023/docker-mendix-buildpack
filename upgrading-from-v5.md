@@ -57,5 +57,5 @@ docker push example.com/mendix-app:latest
 
 # Other changes
 
-Docker Buildpack v6 switched from `ubi8` to `ubi9` images ([Red Hat Universal Base Images](https://developers.redhat.com/articles/ubi-faq) whenever possible.
+Docker Buildpack v6 switched from `ubi8` to `ubi9` images ([Red Hat Universal Base Images](https://developers.redhat.com/articles/ubi-faq)) whenever possible.
 Building Mendix 8 and 9 apps still uses `ubi8`, as those versions depend on an older version of Mono that doesn't work in newer operating systems.
