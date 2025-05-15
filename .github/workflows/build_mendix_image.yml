@@ -1,0 +1,52 @@
+name: Build and Push to AWS ECR
+on: [push]
+
+env:
+  AWS_REGION: cn-north-1  # e.g., us-east-1
+  ECR_REPOSITORY: fams
+  Version: 1.0.0
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    
+    steps:
+
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build Mendix App image
+        run: docker build -t mendix-rootfs:app -f rootfs-app.dockerfile .
+
+      - name: Build Builder image
+        run: docker build -t mendix-rootfs:builder -f rootfs-builder.dockerfile .
+
+      - name: Create Build Folder
+        run: ./build.py --source project/ --destination build/ build-mda-dir
+
+      - name: Build Image
+        run: docker build --tag fams:${{env.Version}} build/
+
+      - name: AWS login
+        run: aws ecr get-login-password --region cn-north-1 | docker login --username AWS --password-stdin 275723753211.dkr.ecr.cn-north-1.amazonaws.com.cn       
+      
+      - name: Tag Image
+        run: docker tag fams:${{env.Version}} 275723753211.dkr.ecr.cn-north-1.amazonaws.com.cn/labull/fams:${{env.Version}}  
+
+      - name: Push images to Amazon ECR
+        run: docker push 275723753211.dkr.ecr.cn-north-1.amazonaws.com.cn/labull/fams:${{env.Version}}
