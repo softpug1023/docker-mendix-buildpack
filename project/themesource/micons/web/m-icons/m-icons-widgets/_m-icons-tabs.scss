@@ -1,0 +1,12 @@
+/*
+    mIcons (also known as symbols) will give you the option to use Material Icons throughout your application! 
+    Please do not make change in this document. You may make changes in m-icons-variables.scss if you like.
+
+    Author: Maurits de Koning-Hewitt, The Orange Force
+*/
+
+@if $m-icons-enable-sidebar-tweak {
+    .mx-tabcontainer .mx-tabcontainer-tabs>li>a::before {
+        margin-right: $spacing-small;
+    }
+}

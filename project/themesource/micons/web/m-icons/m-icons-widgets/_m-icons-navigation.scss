@@ -1,0 +1,25 @@
+/*
+    mIcons (also known as symbols) will give you the option to use Material Icons throughout your application! 
+    Please do not make change in this document. You may make changes in m-icons-variables.scss if you like.
+
+    Author: Maurits de Koning-Hewitt, The Orange Force
+*/
+
+@if $m-icons-enable-sidebar-tweak {
+    .layout-atlas .region-sidebar .mx-navigationtree>.navbar-inner>ul>li {
+        >a [class^="m-icons"] {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 52px;
+            height: 52px;
+            padding: $spacing-small $spacing-medium;
+            border-radius: $border-radius-default;
+            margin-right: 8px;
+            font-size: $m-icons-sidebar-icon-size;
+        }
+        > ul > li [class^="m-icons"]{
+            margin-right: $spacing-small;
+        }
+    }
+}
